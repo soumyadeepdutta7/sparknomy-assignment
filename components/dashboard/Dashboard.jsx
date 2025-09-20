@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Header from "./Header";
 import CreateInvoice from "./CreateInvoice";
 import TimePeriod from "./TimePeriod";
@@ -8,156 +8,17 @@ import EarningsCards from "./EarningsCards";
 import IncomeChart from "./IncomeChart";
 import InvoicesList from "./InvoicesList";
 import ViewToggle from "./ViewToggle";
-
-// 🎯 Central Invoice Data — Realistic with dates and statuses
-const ALL_INVOICES = [
-  {
-    id: 1,
-    client: "Acme Corp",
-    amount: 125000,
-    date: "2025-06-15",
-    status: "Paid",
-  },
-  {
-    id: 2,
-    client: "Beta LLC",
-    amount: 85000,
-    date: "2025-05-20",
-    status: "Unpaid",
-  },
-  {
-    id: 3,
-    client: "Gamma Inc",
-    amount: 200000,
-    date: "2025-04-10",
-    status: "Overdue",
-  },
-  {
-    id: 4,
-    client: "Delta Ltd",
-    amount: 95000,
-    date: "2025-03-05",
-    status: "Paid",
-  },
-  {
-    id: 5,
-    client: "Echo Co",
-    amount: 150000,
-    date: "2025-02-18",
-    status: "Partially Paid",
-  },
-  {
-    id: 6,
-    client: "Foxtrot",
-    amount: 75000,
-    date: "2025-01-30",
-    status: "Awaited",
-  },
-  {
-    id: 7,
-    client: "Golf Inc",
-    amount: 300000,
-    date: "2025-12-15",
-    status: "Disputed",
-  },
-  {
-    id: 8,
-    client: "Hotel LLC",
-    amount: 110000,
-    date: "2025-09-10",
-    status: "Update Status",
-  },
-  {
-    id: 9,
-    client: "India Corp",
-    amount: 180000,
-    date: "2025-10-05",
-    status: "Paid",
-  },
-  {
-    id: 10,
-    client: "Juliet",
-    amount: 65000,
-    date: "2025-09-12",
-    status: "Overdue",
-  },
-  {
-    id: 11,
-    client: "Kilo Ltd",
-    amount: 220000,
-    date: "2025-08-30",
-    status: "Paid",
-  },
-  {
-    id: 12,
-    client: "Lima Co",
-    amount: 90000,
-    date: "2025-07-17",
-    status: "Unpaid",
-  },
-  {
-    id: 13,
-    client: "Mike Inc",
-    amount: 135000,
-    date: "2025-06-25",
-    status: "Paid",
-  },
-  {
-    id: 14,
-    client: "November",
-    amount: 170000,
-    date: "2025-05-08",
-    status: "Awaited",
-  },
-  {
-    id: 15,
-    client: "Oscar LLC",
-    amount: 80000,
-    date: "2025-04-14",
-    status: "Disputed",
-  },
-  {
-    id: 16,
-    client: "Papa Corp",
-    amount: 250000,
-    date: "2025-03-22",
-    status: "Paid",
-  },
-  {
-    id: 17,
-    client: "Quebec",
-    amount: 140000,
-    date: "2025-02-05",
-    status: "Overdue",
-  },
-  {
-    id: 18,
-    client: "Romeo Inc",
-    amount: 160000,
-    date: "2025-01-18",
-    status: "Partially Paid",
-  },
-  {
-    id: 19,
-    client: "Sierra",
-    amount: 105000,
-    date: "2025-12-30",
-    status: "Paid",
-  },
-  {
-    id: 20,
-    client: "Tango Ltd",
-    amount: 190000,
-    date: "2025-11-10",
-    status: "Unpaid",
-  },
-];
+import { toast } from "sonner";
+import axios from "axios";
 
 const Dashboard = () => {
   const [currentView, setCurrentView] = useState("mobile");
   const [activePeriod, setActivePeriod] = useState("3Months");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [invoices, setInvoices] = useState([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   // 🎯 Filter invoices based on selected period
   const filteredInvoices = useMemo(() => {
@@ -173,16 +34,16 @@ const Dashboard = () => {
     } else if (activePeriod === "Custom" && startDate && endDate) {
       start = new Date(startDate);
     } else {
-      return ALL_INVOICES; // fallback
+      return invoices; // fallback
     }
 
     const end = activePeriod === "Custom" && endDate ? new Date(endDate) : now;
 
-    return ALL_INVOICES.filter((inv) => {
+    return invoices.filter((inv) => {
       const invDate = new Date(inv.date);
       return invDate >= start && invDate <= end;
     });
-  }, [activePeriod, startDate, endDate]);
+  }, [activePeriod, startDate, endDate, invoices]);
 
   // 🎯 Recalculate earnings from filtered data
   const earnings = useMemo(() => {
@@ -193,13 +54,45 @@ const Dashboard = () => {
     filteredInvoices.forEach((inv) => {
       const amount = inv.amount;
       total += amount;
-      if (inv.status === "Awaited" || inv.status === "Unpaid")
+      if (
+        inv.status === "awaited" ||
+        inv.status === "unpaid" ||
+        inv.status === null
+      )
         awaited += amount;
-      if (inv.status === "Overdue") overdue += amount;
+      if (inv.status === "overdue") overdue += amount;
     });
 
     return { total, awaited, overdue };
   }, [filteredInvoices]);
+
+  useEffect(() => {
+    const fetchInvoices = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get(
+          "https://68ca7f27430c4476c349b61c.mockapi.io/api/v1/invoices"
+        );
+
+        // Transform API data to match component's expected structure
+        const transformedInvoices = response.data.map((invoice) => ({
+          id: invoice.id,
+          client: invoice.client_name,
+          amount: invoice.due_amount,
+          date: invoice.due_date.split("T")[0], // Extract just the date part
+          status: invoice.status || "unpaid", // Handle null status
+        }));
+
+        setInvoices(transformedInvoices);
+      } catch (err) {
+        setError(err.message);
+        toast.error("Failed to load invoices");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInvoices();
+  }, []);
 
   // 🎯 Generate chart data from filtered invoices (group by month)
   const chartData = useMemo(() => {
@@ -235,12 +128,14 @@ const Dashboard = () => {
     // Convert to array and sort by date
     const data = Object.values(monthly)
       .sort((a, b) => {
-        const [yearA, monthA] = Object.keys(monthly)
-          .find((key) => monthly[key] === a)
-          .split("-");
-        const [yearB, monthB] = Object.keys(monthly)
-          .find((key) => monthly[key] === b)
-          .split("-");
+        // keys for comparison
+        const keyA = Object.keys(monthly).find((key) => monthly[key] === a);
+        const keyB = Object.keys(monthly).find((key) => monthly[key] === b);
+
+        if (!keyA || !keyB) return 0;
+
+        const [yearA, monthA] = keyA.split("-");
+        const [yearB, monthB] = keyB.split("-");
         return new Date(yearA, monthA) - new Date(yearB, monthB);
       })
       .slice(-6); // Last 6 months
@@ -271,6 +166,32 @@ const Dashboard = () => {
     }
   };
 
+  // Add loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+      </div>
+    );
+  }
+
+  // Add error state
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-red-500 text-center">
+          <p>Error loading invoices: {error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-purple-600 text-white rounded"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-gray-50 min-h-screen">
       <ViewToggle currentView={currentView} setCurrentView={setCurrentView} />
@@ -284,7 +205,6 @@ const Dashboard = () => {
         <div className="px-4 pb-6 space-y-6 rounded-t-[46px] px-[16px] pt-[22px] bg-white">
           <CreateInvoice currentView={currentView} />
 
-          {/* ✅ Pass down state setters and values */}
           <TimePeriod
             currentView={currentView}
             activePeriod={activePeriod}
@@ -295,7 +215,6 @@ const Dashboard = () => {
             onEndDateChange={setEndDate}
           />
 
-          {/* ✅ Pass calculated earnings */}
           <EarningsCards
             currentView={currentView}
             totalEarnings={earnings.total}
@@ -303,10 +222,8 @@ const Dashboard = () => {
             paymentOverdue={earnings.overdue}
           />
 
-          {/* ✅ Pass filtered chart data */}
           <IncomeChart currentView={currentView} chartData={chartData} />
 
-          {/* ✅ Pass filtered invoices */}
           <InvoicesList currentView={currentView} invoices={filteredInvoices} />
 
           <div className="text-center mt-8 mb-4 pt-8 border-t border-gray-100">

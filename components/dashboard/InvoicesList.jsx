@@ -9,58 +9,63 @@ const InvoicesList = ({ currentView, invoices = [] }) => {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "Disputed":
+      case "disputed":
         return { backgroundColor: "#FFB1B1", color: "#FF2D55" };
-      case "Paid":
+      case "paid":
         return { backgroundColor: "#9CEFB8", color: "#34C759" };
-      case "Partially Paid":
-        return { backgroundColor: "#FFFAE5", color: "#FFCC00" };
-      case "Overdue":
+      case "overdue":
         return { backgroundColor: "#FFB1B1", color: "#FF2D55" };
-      case "Draft":
-      case "Unpaid":
+      case "draft":
+      case "unpaid":
+      case null: // Handle null status from API
         return { backgroundColor: "#F2F2F2", color: "#999999" };
-      case "Update Status":
+      case "update status":
         return { backgroundColor: "#8134AF", color: "#FFFFFF" };
-      case "Awaited":
+      case "awaited":
         return { backgroundColor: "#FFFAE5", color: "#FFCC00" };
       default:
-        return { backgroundColor: "#F2F2F2", color: "#ffffff" };
+        return { backgroundColor: "#F2F2F2", color: "#999999" };
     }
   };
 
   const getButtonDimensions = (status) => {
     switch (status) {
-      case "Paid":
+      case "paid":
         return { width: "54px", height: "32px" };
-      case "Disputed":
+      case "disputed":
         return { width: "78px", height: "32px" };
-      case "Unpaid":
+      case "unpaid":
         return { width: "68px", height: "32px" };
-      case "Update Status":
+      case "update status":
         return { width: "122px", height: "32px" };
       default:
         return { width: "auto", height: "32px" };
     }
   };
 
+  // Update status options to match API possibilities
   const statusOptions = [
-    "Paid",
-    "Unpaid",
-    "Disputed",
-    "Partially Paid",
-    "Overdue",
-    "Awaited",
-    "Draft",
+    "paid",
+    "unpaid",
+    "disputed",
+    "overdue",
+    "awaited",
+    "draft"
   ];
+
+  // Format status for display (capitalize first letter)
+  const formatStatusForDisplay = (status) => {
+    if (!status) return "Unpaid";
+    return status.charAt(0).toUpperCase() + status.slice(1);
+  };
 
   // Get the display status - either from local state or the original invoice
   const getDisplayStatus = (invoice) => {
-    return invoiceStatuses[invoice.id] || invoice.status;
+    return invoiceStatuses[invoice.id] || invoice.status || "unpaid";
   };
 
   const handleStatusClick = (status, invoiceId) => {
-    // Show dropdown for "Update Status" or allow updating any status
+    // Show dropdown for "update status" or allow updating any status
     setOpenDropdown(openDropdown === invoiceId ? null : invoiceId);
   };
 
@@ -71,12 +76,12 @@ const InvoicesList = ({ currentView, invoices = [] }) => {
       [invoiceId]: newStatus,
     }));
 
-    toast.success(`Status updated to: ${newStatus}`);
+    toast.success(`Status updated to: ${formatStatusForDisplay(newStatus)}`);
     setOpenDropdown(null);
   };
 
   const handleNotificationClick = (status) => {
-    toast.warning(`${status} Notification Sent`);
+    toast.warning(`${formatStatusForDisplay(status)} Notification Sent`);
   };
 
   const getGridClasses = () => {
@@ -107,6 +112,8 @@ const InvoicesList = ({ currentView, invoices = [] }) => {
       <div className={getGridClasses()}>
         {invoices.map((invoice) => {
           const displayStatus = getDisplayStatus(invoice);
+          const formattedStatus = formatStatusForDisplay(displayStatus);
+          
           return (
             <div
               key={invoice.id}
@@ -145,8 +152,8 @@ const InvoicesList = ({ currentView, invoices = [] }) => {
                         cursor: "pointer",
                       }}
                     >
-                      {displayStatus}
-                      {displayStatus === "Update Status" && (
+                      {formattedStatus}
+                      {displayStatus === "update status" && (
                         <img src="/list/drop.svg" alt="dropdown icon" />
                       )}
                     </button>
@@ -166,15 +173,15 @@ const InvoicesList = ({ currentView, invoices = [] }) => {
                               fontSize: "12px",
                             }}
                           >
-                            {option}
+                            {formatStatusForDisplay(option)}
                           </button>
                         ))}
                       </div>
                     )}
                   </div>
 
-                  {(displayStatus === "Overdue" ||
-                    displayStatus === "Awaited") && (
+                  {(displayStatus === "overdue" ||
+                    displayStatus === "awaited") && (
                     <button
                       onClick={() => handleNotificationClick(displayStatus)}
                       className="w-4 h-4 hover:scale-110 transition-transform flex items-center justify-center"
@@ -182,7 +189,7 @@ const InvoicesList = ({ currentView, invoices = [] }) => {
                       <img src="/list/bell.svg" alt="bell icon" />
                     </button>
                   )}
-                  {displayStatus === "Draft" && (
+                  {displayStatus === "draft" && (
                     <button className="w-4 h-4 hover:scale-110 transition-transform flex items-center justify-center">
                       <img src="/list/draft.svg" alt="draft icon" />
                     </button>
